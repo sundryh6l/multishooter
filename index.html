@@ -1,0 +1,259 @@
+<html><head><base href="https://multiplication-game.example.com/">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Multiplication Table Shooter</title>
+<style>
+    body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background-color: #f0f0f0;
+        font-family: Arial, sans-serif;
+    }
+    #gameCanvas {
+        background-color: #e0e0e0;
+    }
+    #gun {
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 60px;
+        height: 60px;
+        background-color: #333;
+        border-radius: 50%;
+        cursor: pointer;
+    }
+    #question {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        font-size: 24px;
+        font-weight: bold;
+    }
+    #score {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        font-size: 24px;
+        font-weight: bold;
+    }
+    #timer {
+        position: absolute;
+        top: 60px;
+        right: 20px;
+        font-size: 18px;
+    }
+    #endScreen {
+        display: none;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 20px;
+        box-sizing: border-box;
+        overflow-y: auto;
+    }
+    #endScreen h2 {
+        text-align: center;
+    }
+    #wrongQuestions {
+        margin-top: 20px;
+    }
+</style>
+</head>
+<body>
+<canvas id="gameCanvas" width="1600" height="800"></canvas>
+<div id="gun"></div>
+<div id="question"></div>
+<div id="score">Score: 0</div>
+<div id="timer">Time: 15s</div>
+<div id="endScreen">
+    <h2>Game Over</h2>
+    <div id="finalScore"></div>
+    <div id="wrongQuestions"></div>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const gun = document.getElementById('gun');
+const questionEl = document.getElementById('question');
+const scoreEl = document.getElementById('score');
+const timerEl = document.getElementById('timer');
+const endScreen = document.getElementById('endScreen');
+const finalScoreEl = document.getElementById('finalScore');
+const wrongQuestionsEl = document.getElementById('wrongQuestions');
+
+const ballRadius = 30;
+const ballSpeed = 3;
+const numBalls = 6;
+let balls = [];
+let currentQuestion = '';
+let currentAnswer = 0;
+let score = 0;
+let timeLeft = 15;
+let timer;
+let wrongQuestions = [];
+
+class Ball {
+    constructor(x, y, dx, dy, text, color) {
+        this.x = x;
+        this.y = y;
+        this.dx = dx;
+        this.dy = dy;
+        this.text = text;
+        this.color = color;
+    }
+
+    draw() {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, ballRadius, 0, Math.PI * 2);
+        ctx.fillStyle = this.color;
+        ctx.fill();
+        ctx.closePath();
+
+        ctx.font = '20px Arial';
+        ctx.fillStyle = 'white';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(this.text, this.x, this.y);
+    }
+
+    move() {
+        this.x += this.dx;
+        this.y += this.dy;
+
+        if (this.x + ballRadius > canvas.width || this.x - ballRadius < 0) {
+            this.dx = -this.dx;
+        }
+        if (this.y + ballRadius > canvas.height || this.y - ballRadius < 0) {
+            this.dy = -this.dy;
+        }
+    }
+}
+
+function generateQuestion() {
+  const a = Math.floor(Math.random() * 9) + 6; // 6 to 14
+  let b;
+  do {
+    b = Math.floor(Math.random() * 9) + 2; // 2 to 11
+  } while (b <= 2 || b === 10); // Exclude 1, 2, and 10
+
+  currentQuestion = `${a} × ${b}`;
+  currentAnswer = a * b;
+  questionEl.textContent = currentQuestion + ' = ?';
+}
+
+function generateWrongAnswer() {
+    let wrongAnswer;
+    do {
+        wrongAnswer = Math.floor(Math.random() * 100) + 1;
+    } while (wrongAnswer === currentAnswer || wrongAnswer % 10 !== currentAnswer % 10);
+    return wrongAnswer;
+}
+
+function createBalls() {
+    balls = [];
+    const correctIndex = Math.floor(Math.random() * numBalls);
+
+    for (let i = 0; i < numBalls; i++) {
+        const x = Math.random() * (canvas.width - 2 * ballRadius) + ballRadius;
+        const y = Math.random() * (canvas.height - 2 * ballRadius) + ballRadius;
+        const dx = (Math.random() - 0.5) * 2 * ballSpeed;
+        const dy = (Math.random() - 0.5) * 2 * ballSpeed;
+        const text = i === correctIndex ? currentAnswer : generateWrongAnswer();
+        const color = `hsl(${Math.random() * 360}, 70%, 50%)`;
+
+        balls.push(new Ball(x, y, dx, dy, text, color));
+    }
+}
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    balls.forEach(ball => {
+        ball.move();
+        ball.draw();
+    });
+}
+
+function startRound() {
+    generateQuestion();
+    createBalls();
+    timeLeft = 15;
+    timerEl.textContent = `Time: ${timeLeft}s`;
+    clearInterval(timer);
+    timer = setInterval(() => {
+        timeLeft--;
+        timerEl.textContent = `Time: ${timeLeft}s`;
+        if (timeLeft <= 0) {
+            handleWrongAnswer();
+        }
+    }, 1000);
+}
+
+function handleCorrectAnswer() {
+    score++;
+    scoreEl.textContent = `Score: ${score}`;
+    if (score >= 30) {
+        endGame();
+    } else {
+        startRound();
+    }
+}
+
+function handleWrongAnswer() {
+    score = Math.max(0, score - 4);
+    scoreEl.textContent = `Score: ${score}`;
+    wrongQuestions.push({question: currentQuestion, answer: currentAnswer});
+    alert(`Wrong! The correct answer is ${currentAnswer}.`);
+    startRound();
+}
+
+function endGame() {
+    clearInterval(timer);
+    endScreen.style.display = 'block';
+    finalScoreEl.textContent = `Final Score: ${score}`;
+    
+    if (wrongQuestions.length > 0) {
+        const wrongQuestionsHtml = wrongQuestions.map(q => 
+            `<p>${q.question} = ${q.answer}</p>`
+        ).join('');
+        wrongQuestionsEl.innerHTML = `<h3>Questions to review:</h3>${wrongQuestionsHtml}`;
+    } else {
+        wrongQuestionsEl.innerHTML = '<p>Congratulations! You answered all questions correctly!</p>';
+    }
+}
+
+function shoot(event) {
+    const rect = canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+
+    for (let ball of balls) {
+        const distance = Math.sqrt((x - ball.x) ** 2 + (y - ball.y) ** 2);
+        if (distance < ballRadius) {
+            if (ball.text === currentAnswer) {
+                handleCorrectAnswer();
+            } else {
+                handleWrongAnswer();
+            }
+            break;
+        }
+    }
+}
+
+canvas.addEventListener('click', shoot);
+
+function gameLoop() {
+    draw();
+    requestAnimationFrame(gameLoop);
+}
+
+startRound();
+gameLoop();
+</script>
+</body></html>
